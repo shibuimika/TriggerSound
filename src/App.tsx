@@ -2,18 +2,19 @@ import { useState, useRef, useEffect } from 'react'
 import './App.css'
 
 // 型定義
-interface TriggerWord {
-  word: string
-  title: string
-  youtubeId: string
-  startTime?: number // 再生開始時間（秒）
-}
+type TriggerWord = {
+  word: string;
+  title: string;
+  youtubeId: string;
+  startSeconds?: number;
+};
 
 // 事前登録ワードとYouTube動画情報のリスト
 const TRIGGER_WORDS: TriggerWord[] = [
   { word: '乾杯', title: 'ファンファーレ', youtubeId: 'dQw4w9WgXcQ' },
   { word: 'おめでとう', title: 'お祝いソング', youtubeId: '3JZ_D3ELwOQ' },
-  { word: '異端', title: '怪獣', youtubeId: 'a8dgNdJVluc', startTime: 9 },
+  { word: 'ごめんなさい', title: '女々しくて', youtubeId: 'BC9P3DSZu0A', startSeconds: 27 },
+  { word: '異端', title: '怪獣', youtubeId: 'a8dgNdJVluc', startSeconds: 9 },
   // 必要に応じて追加
 ]
 
@@ -41,7 +42,7 @@ function App() {
   // 検出ワードが変わったらYouTube再生
   useEffect(() => {
     if (detected && (window as any).YT && (window as any).YT.Player) {
-      playYouTube(detected.youtubeId, detected.startTime)
+      playYouTube(detected.youtubeId, detected.startSeconds)
     }
     // eslint-disable-next-line
   }, [detected])
@@ -70,14 +71,10 @@ function App() {
   }, [isListening])
 
   // YouTube再生関数
-  const playYouTube = (videoId: string, startTime?: number) => {
+  const playYouTube = (videoId: string, startSeconds?: number) => {
     setIsPlaying(true)
     if (playerRef.current) {
-      playerRef.current.loadVideoById(videoId)
-      if (startTime && startTime > 0) {
-        // 動画が読み込まれてから再生位置を設定
-        playerRef.current.seekTo(startTime, true)
-      }
+      playerRef.current.loadVideoById({ videoId, startSeconds: startSeconds || 0 })
       playerRef.current.playVideo()
       return
     }
@@ -85,10 +82,11 @@ function App() {
       height: '0',
       width: '0',
       videoId,
+      playerVars: startSeconds ? { start: startSeconds } : {},
       events: {
         onReady: (event: any) => {
-          if (startTime && startTime > 0) {
-            event.target.seekTo(startTime, true)
+          if (startSeconds) {
+            event.target.seekTo(startSeconds)
           }
           event.target.playVideo()
         },
@@ -213,7 +211,7 @@ function App() {
         {detected ? (
           <span className="text-pink-600 font-bold">
             {detected.word}（{detected.title}
-            {detected.startTime && detected.startTime > 0 && ` / ${detected.startTime}秒から`}）
+            {detected.startSeconds && detected.startSeconds > 0 && ` / ${detected.startSeconds}秒から`}）
           </span>
         ) : (
           <span className="text-gray-400">---</span>
