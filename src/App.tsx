@@ -75,7 +75,11 @@ function App() {
   const playYouTube = (videoId: string, startSeconds?: number) => {
     setIsPlaying(true)
     if (playerRef.current) {
-      playerRef.current.loadVideoById({ videoId, startSeconds: startSeconds || 0 })
+      if (typeof startSeconds === 'number' && startSeconds > 0) {
+        playerRef.current.loadVideoById({ videoId, startSeconds })
+      } else {
+        playerRef.current.loadVideoById(videoId)
+      }
       playerRef.current.playVideo()
       return
     }
@@ -83,10 +87,10 @@ function App() {
       height: '0',
       width: '0',
       videoId,
-      playerVars: startSeconds ? { start: startSeconds } : {},
+      playerVars: (typeof startSeconds === 'number' && startSeconds > 0) ? { start: startSeconds } : {},
       events: {
         onReady: (event: any) => {
-          if (startSeconds) {
+          if (typeof startSeconds === 'number' && startSeconds > 0) {
             event.target.seekTo(startSeconds)
           }
           event.target.playVideo()
