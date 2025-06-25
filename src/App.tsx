@@ -1,10 +1,19 @@
 import { useState, useRef, useEffect } from 'react'
 import './App.css'
 
+// 型定義
+interface TriggerWord {
+  word: string
+  title: string
+  youtubeId: string
+  startTime?: number // 再生開始時間（秒）
+}
+
 // 事前登録ワードとYouTube動画情報のリスト
-const TRIGGER_WORDS = [
+const TRIGGER_WORDS: TriggerWord[] = [
   { word: '乾杯', title: 'ファンファーレ', youtubeId: 'dQw4w9WgXcQ' },
   { word: 'おめでとう', title: 'お祝いソング', youtubeId: '3JZ_D3ELwOQ' },
+  { word: '異端', title: '怪獣', youtubeId: 'a8dgNdJVluc', startTime: 9 },
   // 必要に応じて追加
 ]
 
@@ -13,7 +22,7 @@ const REACTION_INTERVAL = 30 * 1000 // 30秒
 function App() {
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
-  const [detected, setDetected] = useState<{word: string, title: string, youtubeId: string} | null>(null)
+  const [detected, setDetected] = useState<TriggerWord | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [lastReacted, setLastReacted] = useState<{[word: string]: number}>({})
   const recognitionRef = useRef<any>(null)
@@ -32,7 +41,7 @@ function App() {
   // 検出ワードが変わったらYouTube再生
   useEffect(() => {
     if (detected && (window as any).YT && (window as any).YT.Player) {
-      playYouTube(detected.youtubeId)
+      playYouTube(detected.youtubeId, detected.startTime)
     }
     // eslint-disable-next-line
   }, [detected])
@@ -61,10 +70,14 @@ function App() {
   }, [isListening])
 
   // YouTube再生関数
-  const playYouTube = (videoId: string) => {
+  const playYouTube = (videoId: string, startTime?: number) => {
     setIsPlaying(true)
     if (playerRef.current) {
       playerRef.current.loadVideoById(videoId)
+      if (startTime && startTime > 0) {
+        // 動画が読み込まれてから再生位置を設定
+        playerRef.current.seekTo(startTime, true)
+      }
       playerRef.current.playVideo()
       return
     }
@@ -74,6 +87,9 @@ function App() {
       videoId,
       events: {
         onReady: (event: any) => {
+          if (startTime && startTime > 0) {
+            event.target.seekTo(startTime, true)
+          }
           event.target.playVideo()
         },
         onStateChange: (event: any) => {
@@ -195,7 +211,10 @@ function App() {
       <div className="mb-4 text-center">
         <span className="font-semibold">検出ワード：</span>
         {detected ? (
-          <span className="text-pink-600 font-bold">{detected.word}（{detected.title} / {detected.youtubeId}）</span>
+          <span className="text-pink-600 font-bold">
+            {detected.word}（{detected.title}
+            {detected.startTime && detected.startTime > 0 && ` / ${detected.startTime}秒から`}）
+          </span>
         ) : (
           <span className="text-gray-400">---</span>
         )}
