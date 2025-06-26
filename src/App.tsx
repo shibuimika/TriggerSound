@@ -17,6 +17,7 @@ const TRIGGER_WORDS: TriggerWord[] = [
   { word: '異端', title: '怪獣', youtubeId: 'a8dgNdJVluc', startSeconds: 9 },
   { word: '地動説', title: '怪獣', youtubeId: 'a8dgNdJVluc', startSeconds: 9 },
   { word: '好きです', title: 'ラブ・ストーリーは突然に', youtubeId: 'LDe0rbDromY', startSeconds: 0 },
+  { word: '悲しい', title: 'Lemon', youtubeId: 'SX_ViT4Ra7k', startSeconds: 2 },
   // 必要に応じて追加
 ]
 
