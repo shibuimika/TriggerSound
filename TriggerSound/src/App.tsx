@@ -9,6 +9,12 @@ type TriggerWord = {
   startSeconds?: number;
 };
 
+// iOS判定
+const isIOS = () => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 // 事前登録ワードとYouTube動画情報のリスト
 const TRIGGER_WORDS: TriggerWord[] = [
   { word: '乾杯', title: 'ファンファーレ', youtubeId: 'dQw4w9WgXcQ' },
@@ -19,6 +25,7 @@ const TRIGGER_WORDS: TriggerWord[] = [
   { word: '悲しい', title: 'Lemon', youtubeId: 'SX_ViT4Ra7k', startSeconds: 2 },
   { word: '激アツ', title: '激アツサウンド', youtubeId: 'AnXBdZiESfo', startSeconds: 13 },
   { word: 'ありがとう', title: 'ありがとうサウンド', youtubeId: 'VZBU8LvZ91Q', startSeconds: 22 },
+  { word: '例えば', title: 'カタオモイ', youtubeId: 'kxs9Su_mbpU', startSeconds: 13 },
   // 必要に応じて追加
 ]
 
@@ -30,9 +37,12 @@ function App() {
   const [detected, setDetected] = useState<TriggerWord | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [lastReacted, setLastReacted] = useState<{[word: string]: number}>({})
+  const [error, setError] = useState<string>('')
+  const [isManualStop, setIsManualStop] = useState(false)
   const recognitionRef = useRef<any>(null)
   const playerRef = useRef<any>(null)
   const iframeContainerRef = useRef<HTMLDivElement>(null)
+  const restartTimeoutRef = useRef<number | null>(null)
 
   // YouTube IFrame APIのスクリプトを動的に読み込む
   useEffect(() => {
@@ -122,57 +132,122 @@ function App() {
   const getRecognition = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
-      alert('このブラウザは音声認識に対応していません（Chrome推奨）')
+      setError('このブラウザは音声認識に対応していません（Safari/Chrome推奨）')
       return null
     }
     const recognition = new SpeechRecognition()
     recognition.lang = 'ja-JP'
-    recognition.continuous = true
-    recognition.interimResults = true
+    
+    // iOS Safari対応
+    if (isIOS()) {
+      recognition.continuous = false  // iOSではcontinuous modeが不安定
+      recognition.interimResults = false  // 中間結果も無効化
+    } else {
+      recognition.continuous = true
+      recognition.interimResults = true
+    }
+    
     return recognition
   }
 
-  const handleStart = () => {
+  const startRecognition = () => {
     if (isListening) return
+    setError('')
     setDetected(null)
     setIsPlaying(false)
     const recognition = getRecognition()
     if (!recognition) return
+    
     recognitionRef.current = recognition
     recognition.onresult = (event: any) => {
       let finalTranscript = ''
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-        finalTranscript += event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript
+        }
       }
-      setTranscript(finalTranscript)
-      // 制御ルール：曲再生中は無視
-      if (isPlaying) return
-      // ワード検出
-      const now = Date.now()
-      for (const item of TRIGGER_WORDS) {
-        if (finalTranscript.includes(item.word)) {
-          // 30秒以内の同一ワードは無視
-          if (lastReacted[item.word] && now - lastReacted[item.word] < REACTION_INTERVAL) {
-            continue
+      if (finalTranscript) {
+        setTranscript(finalTranscript)
+        // 制御ルール：曲再生中は無視
+        if (isPlaying) return
+        // ワード検出
+        const now = Date.now()
+        for (const item of TRIGGER_WORDS) {
+          if (finalTranscript.includes(item.word)) {
+            // 30秒以内の同一ワードは無視
+            if (lastReacted[item.word] && now - lastReacted[item.word] < REACTION_INTERVAL) {
+              continue
+            }
+            setDetected(item)
+            setLastReacted(prev => ({ ...prev, [item.word]: now }))
+            break
           }
-          setDetected(item)
-          setLastReacted(prev => ({ ...prev, [item.word]: now }))
-          break
         }
       }
     }
+
     recognition.onerror = (event: any) => {
-      alert('音声認識エラー: ' + event.error)
-      setIsListening(false)
+      const errorMessage = {
+        'not-allowed': 'マイクの使用が許可されていません。設定から許可してください。',
+        'network': 'ネットワークエラーが発生しました。接続を確認してください。',
+        'no-speech': '音声が検出されませんでした。',
+        'aborted': '音声認識が中断されました。',
+        'default': '音声認識エラーが発生しました。'
+      }
+      const message = errorMessage[event.error as keyof typeof errorMessage] || errorMessage.default
+      setError(message)
+      
+      // エラーに応じた再開ロジック
+      if (['network', 'no-speech', 'aborted'].includes(event.error)) {
+        handleRecognitionEnd()
+      } else {
+        setIsListening(false)
+      }
     }
+
     recognition.onend = () => {
+      handleRecognitionEnd()
+    }
+
+    try {
+      recognition.start()
+      setIsListening(true)
+      setIsManualStop(false)
+    } catch (e) {
+      setError('音声認識の開始に失敗しました。')
       setIsListening(false)
     }
-    recognition.start()
-    setIsListening(true)
+  }
+
+  const handleRecognitionEnd = () => {
+    if (isListening && !isManualStop) {
+      // iOSの場合は即時再開
+      if (isIOS()) {
+        startRecognition()
+      } else {
+        // その他の場合は1秒後に再開
+        if (restartTimeoutRef.current) {
+          window.clearTimeout(restartTimeoutRef.current)
+        }
+        restartTimeoutRef.current = window.setTimeout(() => {
+          startRecognition()
+        }, 1000)
+      }
+    } else {
+      setIsListening(false)
+    }
+  }
+
+  const handleStart = () => {
+    startRecognition()
   }
 
   const handleStop = () => {
+    setIsManualStop(true)
+    if (restartTimeoutRef.current) {
+      window.clearTimeout(restartTimeoutRef.current)
+      restartTimeoutRef.current = null
+    }
     if (recognitionRef.current) {
       recognitionRef.current.stop()
       recognitionRef.current = null
@@ -181,9 +256,26 @@ function App() {
     setIsListening(false)
   }
 
+  // クリーンアップ
+  useEffect(() => {
+    return () => {
+      if (restartTimeoutRef.current) {
+        window.clearTimeout(restartTimeoutRef.current)
+      }
+      if (recognitionRef.current) {
+        recognitionRef.current.stop()
+      }
+    }
+  }, [])
+
   return (
     <div className="p-4 sm:p-8 max-w-md mx-auto min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 flex flex-col justify-center">
       <h1 className="text-2xl sm:text-3xl font-bold text-blue-500 mb-6 text-center drop-shadow">TriggerSound（仮）</h1>
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-center">
+          {error}
+        </div>
+      )}
       <div className="flex gap-4 mb-6 justify-center">
         <button
           className={`px-6 py-3 rounded-lg bg-green-500 text-white font-bold shadow-md focus:outline-none focus:ring-4 focus:ring-green-300 transition disabled:opacity-50 disabled:cursor-not-allowed text-lg sm:text-xl`}
