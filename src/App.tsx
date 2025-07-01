@@ -19,6 +19,7 @@ const TRIGGER_WORDS: TriggerWord[] = [
   { word: '悲しい', title: 'Lemon', youtubeId: 'SX_ViT4Ra7k', startSeconds: 2 },
   { word: '激アツ', title: '激アツサウンド', youtubeId: 'AnXBdZiESfo', startSeconds: 13 },
   { word: 'ありがとう', title: 'ありがとうサウンド', youtubeId: 'VZBU8LvZ91Q', startSeconds: 22 },
+  { word: '例えば', title: 'カタオモイ', youtubeId: 'kxs9Su_mbpU', startSeconds: 13 },
   // 必要に応じて追加
 ]
 
