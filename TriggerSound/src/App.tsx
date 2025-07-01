@@ -49,6 +49,17 @@ function App() {
     if (!(window as any).YT) {
       const tag = document.createElement('script')
       tag.src = 'https://www.youtube.com/iframe_api'
+      
+      // APIの読み込み完了を待つ
+      ;(window as any).onYouTubeIframeAPIReady = () => {
+        // APIの読み込みが完了したらエラーをクリア
+        setError('')
+      }
+      
+      tag.onerror = () => {
+        setError('YouTube APIの読み込みに失敗しました。ネットワーク接続を確認してください。')
+      }
+      
       document.body.appendChild(tag)
     }
   }, [])
@@ -85,38 +96,78 @@ function App() {
   }, [isListening])
 
   // YouTube再生関数
-  const playYouTube = (videoId: string, startSeconds?: number) => {
-    setIsPlaying(true)
-    if (playerRef.current) {
-      if (typeof startSeconds === 'number' && startSeconds > 0) {
-        playerRef.current.loadVideoById({ videoId, startSeconds })
-      } else {
-        playerRef.current.loadVideoById(videoId)
+  const playYouTube = async (videoId: string, startSeconds?: number) => {
+    try {
+      setIsPlaying(true)
+      if (playerRef.current) {
+        // iOS向けに音声再生の準備
+        if (isIOS()) {
+          try {
+            await playerRef.current.playVideo()
+            await new Promise(resolve => setTimeout(resolve, 100))
+          } catch (e) {
+            console.warn('iOS autoplay preparation failed:', e)
+          }
+        }
+        
+        if (typeof startSeconds === 'number' && startSeconds > 0) {
+          playerRef.current.loadVideoById({ videoId, startSeconds })
+        } else {
+          playerRef.current.loadVideoById(videoId)
+        }
+        playerRef.current.playVideo()
+        return
       }
-      playerRef.current.playVideo()
-      return
+
+      // 新しいプレーヤーの初期化
+      try {
+        playerRef.current = new (window as any).YT.Player('yt-player', {
+          height: '0',
+          width: '0',
+          videoId,
+          playerVars: {
+            ...(typeof startSeconds === 'number' && startSeconds > 0 ? { start: startSeconds } : {}),
+            playsinline: 1, // iOSでインライン再生を強制
+            controls: 0,    // コントロールを非表示
+          },
+          events: {
+            onReady: (event: any) => {
+              if (typeof startSeconds === 'number' && startSeconds > 0) {
+                event.target.seekTo(startSeconds)
+              }
+              event.target.playVideo()
+            },
+            onStateChange: (event: any) => {
+              // 動画終了時
+              if (event.data === 0) {
+                setIsPlaying(false)
+                setDetected(null)
+              }
+              // エラー時
+              if (event.data === -1) {
+                console.warn('YouTube player error state detected')
+              }
+            },
+            onError: (event: any) => {
+              console.error('YouTube player error:', event)
+              setError('動画の再生に失敗しました。しばらく待ってから再度お試しください。')
+              setIsPlaying(false)
+              setDetected(null)
+            }
+          },
+        })
+      } catch (e) {
+        console.error('Failed to initialize YouTube player:', e)
+        setError('プレーヤーの初期化に失敗しました。ページを再読み込みしてください。')
+        setIsPlaying(false)
+        setDetected(null)
+      }
+    } catch (error) {
+      console.error('playYouTube error:', error)
+      setError('動画の再生に失敗しました。画面をタップしてから再度お試しください。')
+      setIsPlaying(false)
+      setDetected(null)
     }
-    playerRef.current = new (window as any).YT.Player('yt-player', {
-      height: '0',
-      width: '0',
-      videoId,
-      playerVars: (typeof startSeconds === 'number' && startSeconds > 0) ? { start: startSeconds } : {},
-      events: {
-        onReady: (event: any) => {
-          if (typeof startSeconds === 'number' && startSeconds > 0) {
-            event.target.seekTo(startSeconds)
-          }
-          event.target.playVideo()
-        },
-        onStateChange: (event: any) => {
-          // 動画終了時
-          if (event.data === 0) {
-            setIsPlaying(false)
-            setDetected(null)
-          }
-        },
-      },
-    })
   }
 
   // YouTube停止関数
