@@ -21,6 +21,7 @@ const TRIGGER_WORDS: TriggerWord[] = [
   { word: 'おめでとう', title: 'お祝いソング', youtubeId: '3JZ_D3ELwOQ' },
   { word: 'ごめんなさい', title: '女々しくて', youtubeId: 'BC9P3DSZu0A', startSeconds: 27 },
   { word: '異端', title: '怪獣', youtubeId: 'a8dgNdJVluc', startSeconds: 9 },
+  { word: '地動説', title: '怪獣', youtubeId: 'a8dgNdJVluc', startSeconds: 9 },
   { word: '好きです', title: 'ラブ・ストーリーは突然に', youtubeId: 'LDe0rbDromY', startSeconds: 0 },
   { word: '悲しい', title: 'Lemon', youtubeId: 'SX_ViT4Ra7k', startSeconds: 2 },
   { word: '激アツ', title: '激アツサウンド', youtubeId: 'AnXBdZiESfo', startSeconds: 13 },
