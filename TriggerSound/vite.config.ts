@@ -2,6 +2,26 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath, URL } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// 開発環境でHTTPS設定を取得
+const getHttpsConfig = () => {
+  if (process.env.NODE_ENV === 'development') {
+    const keyPath = path.join(__dirname, '.cert', 'key.pem')
+    const certPath = path.join(__dirname, '.cert', 'cert.pem')
+    
+    if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+      return {
+        key: fs.readFileSync(keyPath),
+        cert: fs.readFileSync(certPath),
+        minVersion: 'TLSv1.2' as const,
+      }
+    }
+  }
+  return undefined
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -13,11 +33,7 @@ export default defineConfig({
     host: '0.0.0.0',  // すべてのネットワークインターフェースでリッスン
     port: 5173,       // ポートを固定
     strictPort: true, // 指定したポートが使用中の場合はエラーを出す
-    https: process.env.NODE_ENV === 'development' ? {
-      key: fs.readFileSync(path.join(__dirname, '.cert', 'key.pem')),
-      cert: fs.readFileSync(path.join(__dirname, '.cert', 'cert.pem')),
-      minVersion: 'TLSv1.2',
-    } : false,
+    https: getHttpsConfig(),
     headers: {
       'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
     },
@@ -29,5 +45,14 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src')  // ソースディレクトリのエイリアス
     }
-  }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
 })

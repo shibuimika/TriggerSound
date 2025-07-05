@@ -1,0 +1,12 @@
+[build]
+  base = "TriggerSound"
+  command = "npm run build"
+  publish = "TriggerSound/dist"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200 
