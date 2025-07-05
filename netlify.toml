@@ -1,7 +1,7 @@
 [build]
   base = "TriggerSound"
   command = "npm run build"
-  publish = "TriggerSound/dist"
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "18"
