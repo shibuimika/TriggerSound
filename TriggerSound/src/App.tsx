@@ -45,28 +45,86 @@ function App() {
   const [lastReacted, setLastReacted] = useState<{[word: string]: number}>({})
   const [error, setError] = useState<string>('')
   const [isManualStop, setIsManualStop] = useState(false)
+  const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | 'checking'>('checking')
   const recognitionRef = useRef<any>(null)
   const playerRef = useRef<any>(null)
   const iframeContainerRef = useRef<HTMLDivElement>(null)
   const restartTimeoutRef = useRef<number | null>(null)
 
+  // ネットワーク接続状態の監視
+  useEffect(() => {
+    const checkNetworkStatus = () => {
+      setNetworkStatus(navigator.onLine ? 'online' : 'offline')
+    }
+    
+    checkNetworkStatus()
+    
+    window.addEventListener('online', checkNetworkStatus)
+    window.addEventListener('offline', checkNetworkStatus)
+    
+    return () => {
+      window.removeEventListener('online', checkNetworkStatus)
+      window.removeEventListener('offline', checkNetworkStatus)
+    }
+  }, [])
+
   // YouTube IFrame APIのスクリプトを動的に読み込む
   useEffect(() => {
+    console.log('YouTube API loading started...')
+    console.log('Current location:', window.location.href)
+    console.log('Protocol:', window.location.protocol)
+    
     if (!(window as any).YT) {
       const tag = document.createElement('script')
       tag.src = 'https://www.youtube.com/iframe_api'
+      tag.async = true
+      tag.defer = true
       
       // APIの読み込み完了を待つ
       ;(window as any).onYouTubeIframeAPIReady = () => {
+        console.log('YouTube API loaded successfully')
         // APIの読み込みが完了したらエラーをクリア
         setError('')
       }
       
-      tag.onerror = () => {
-        setError('YouTube APIの読み込みに失敗しました。ネットワーク接続を確認してください。')
+      tag.onerror = (e) => {
+        console.error('YouTube API load error:', e)
+        console.error('Error details:', {
+          type: e.type,
+          target: e.target,
+          currentTarget: e.currentTarget
+        })
+        setError(`YouTube APIの読み込みに失敗しました。ネットワーク接続を確認してください。(${e.type})`)
       }
       
-      document.body.appendChild(tag)
+      tag.onload = () => {
+        console.log('YouTube API script loaded')
+        // スクリプトは読み込まれたが、APIがまだ準備できていない可能性
+        setTimeout(() => {
+          if (!(window as any).YT || !(window as any).YT.Player) {
+            console.warn('YouTube API script loaded but YT.Player not available')
+            setError('YouTube APIの初期化に失敗しました。ページを再読み込みしてください。')
+          }
+        }, 3000)
+      }
+      
+      // タイムアウト処理
+      const timeoutId = setTimeout(() => {
+        if (!(window as any).YT || !(window as any).YT.Player) {
+          console.error('YouTube API loading timeout')
+          setError('YouTube APIの読み込みがタイムアウトしました。ネットワーク接続を確認してください。')
+        }
+      }, 10000)
+      
+      document.head.appendChild(tag)
+      
+      // クリーンアップ
+      return () => {
+        clearTimeout(timeoutId)
+      }
+    } else {
+      console.log('YouTube API already loaded')
+      setError('')
     }
   }, [])
 
@@ -105,6 +163,18 @@ function App() {
   const playYouTube = async (videoId: string, startSeconds?: number) => {
     try {
       setIsPlaying(true)
+      
+      // YouTube APIが利用できない場合は直接YouTubeページを開く
+      if (!(window as any).YT || !(window as any).YT.Player) {
+        console.warn('YouTube API not available, opening YouTube page directly')
+        const startParam = startSeconds ? `&t=${startSeconds}s` : ''
+        const url = `https://www.youtube.com/watch?v=${videoId}${startParam}`
+        window.open(url, '_blank')
+        setIsPlaying(false)
+        setDetected(null)
+        return
+      }
+      
       if (playerRef.current) {
         // iOS向けに音声再生の準備
         if (isIOS()) {
@@ -330,7 +400,20 @@ function App() {
       <h1 className="text-2xl sm:text-3xl font-bold text-blue-500 mb-6 text-center drop-shadow">TriggerSound（仮）</h1>
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-center">
-          {error}
+          <div className="mb-2">{error}</div>
+          {error.includes('YouTube API') && (
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition"
+            >
+              ページを再読み込み
+            </button>
+          )}
+        </div>
+      )}
+      {networkStatus === 'offline' && (
+        <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded-lg text-center">
+          ⚠️ ネットワークに接続されていません
         </div>
       )}
       <div className="flex gap-4 mb-6 justify-center">
@@ -386,6 +469,15 @@ function App() {
       <div ref={iframeContainerRef} style={{ width: 0, height: 0, overflow: 'hidden' }}>
         <div id="yt-player" />
       </div>
+      {/* デバッグ情報（開発環境のみ） */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-gray-600">
+          <div>Network: {networkStatus}</div>
+          <div>YouTube API: {(window as any).YT ? 'Loaded' : 'Not loaded'}</div>
+          <div>HTTPS: {location.protocol === 'https:' ? 'Yes' : 'No'}</div>
+          <div>User Agent: {navigator.userAgent.substring(0, 50)}...</div>
+        </div>
+      )}
       <footer className="mt-8 text-xs text-gray-400 text-center select-none">
         © {new Date().getFullYear()} TriggerSound
       </footer>
