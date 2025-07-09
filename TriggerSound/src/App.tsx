@@ -30,6 +30,12 @@ const TRIGGER_WORDS: TriggerWord[] = [
   { word: 'さようなら', title: 'Pretender', youtubeId: 'TQ8WlA2GXbk', startSeconds: 228 },
   { word: 'とさよなら', title: 'Pretender', youtubeId: 'TQ8WlA2GXbk', startSeconds: 228 },
   { word: 'バイバイ', title: 'Pretender', youtubeId: 'TQ8WlA2GXbk', startSeconds: 228 },
+  { word: 'おつかれさま', title: 'おつかれSUMMER', youtubeId: 'j1DnOm0DdQU', startSeconds: 0 },
+  { word: 'おつかれ', title: 'おつかれSUMMER', youtubeId: 'j1DnOm0DdQU', startSeconds: 0 },
+  { word: 'お疲れ様', title: 'おつかれSUMMER', youtubeId: 'j1DnOm0DdQU', startSeconds: 0 },
+  { word: 'お疲れさま', title: 'おつかれSUMMER', youtubeId: 'j1DnOm0DdQU', startSeconds: 0 },
+  { word: 'お疲れ様です', title: 'おつかれSUMMER', youtubeId: 'j1DnOm0DdQU', startSeconds: 0 },
+  { word: 'お疲れさまです', title: 'おつかれSUMMER', youtubeId: 'j1DnOm0DdQU', startSeconds: 0 },
   // 必要に応じて追加
 ]
 
